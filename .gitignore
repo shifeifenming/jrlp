@@ -1,0 +1,6 @@
+IGN_*.*
+
+.vscode
+.venv
+
+__pycache__
