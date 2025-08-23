@@ -4,3 +4,4 @@ IGN_*.*
 .venv
 
 __pycache__
+response.json
