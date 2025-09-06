@@ -78,7 +78,7 @@ if (!seal.ext.find('今日老婆')) {
      * @return {Promise<Object>} 返回一个包含文件名和图片 URL 的 Promise 对象
      */
     async function getCharacterData() {
-        const apiUrl = seal.ext.getStringConfig(ext, "api_url") + '/api/character';
+        const apiUrl = 'http://localhost:18428/api/character';
 
         try {
             const response = await fetch(apiUrl);
@@ -93,31 +93,8 @@ if (!seal.ext.find('今日老婆')) {
         }
     }
 
-    async function getApiStatus() {
-        const apiUrl = 'http://localhost:18428/status';
-
-        try {
-            const response = await fetch(apiUrl);
-            if (!response.ok) {
-                throw new Error(`[jrlp.HTTP.ERROR] 状态码: ${response.status}`);
-            }
-
-            let result = `API 状态: ${response.service_availability}\n
-            系统状态: [CPU: ${system_metrics.cpu_usage_percent}% | RAM: ${system_metrics.used_gb}GB/${system_metrics.total_gb}GB ${system_metrics.percent}]\n
-            访问统计: [jrlp: ${access_statistics["/api/character"]} | status: ${access_statistics["/status"]}]`;
-
-            return result;
-
-        } catch (error) {
-            console.error('[jrlp.requset.ERROR]:', error);
-            throw error;
-        }
-    }
-
     const ext = seal.ext.new('今日老婆', '群友，艾因，是非， ', '1.0.0');
     seal.ext.register(ext);
-    seal.ext.registerStringConfig(ext, "api_url", "http://localhost:18428", "jrlp 后端地址");
-    seal.ext.registerIntConfig(ext, "daily_hlp_limit", 5, "每天最多换老婆次数");
 
     /**
      * 处理获取老婆的通用请求逻辑
@@ -129,18 +106,15 @@ if (!seal.ext.find('今日老婆')) {
         try {
             const data = await getCharacterData();
             const { filename, image_url } = data;
-
+            
             let currentCount = parseInt(getDecryptedVar(ctx, `$m今日老婆次数`)) || 0;
             let messageSuffix = '';
 
             if (isHlp) {
-                const daily_hlp_limit = seal.ext.getIntConfig(ext, "daily_hlp_limit");
-                
-                if (currentCount >= daily_hlp_limit) {
+                if (currentCount >= 6) {
                     const wifeImg = getDecryptedVar(ctx, `$m今日老婆`);
                     const wifeName = getDecryptedVar(ctx, `$m老婆名字`);
-                    
-                    messageSuffix = `(一天最多换 ${daily_hlp_limit} 次老婆喵)`;
+                    messageSuffix = '(一天最多换五次老婆喵)';
                     seal.replyToSender(ctx, msg, seal.format(ctx, `[CQ:image,file=${wifeImg}]\n{$t玩家}今天的老婆是${wifeName}${messageSuffix}`));
                     return;
                 }
@@ -151,7 +125,7 @@ if (!seal.ext.find('今日老婆')) {
             setEncryptedVar(ctx, `$m老婆名字`, filename);
             currentCount++;
             setEncryptedVar(ctx, `$m今日老婆次数`, currentCount);
-
+            
             seal.replyToSender(ctx, msg, seal.format(ctx, `[CQ:image,file=${image_url}]\n{$t玩家}今天的老婆是${filename}`));
 
         } catch (error) {
@@ -159,15 +133,15 @@ if (!seal.ext.find('今日老婆')) {
             seal.replyToSender(ctx, msg, '获取老婆失败，请稍后再试');
         }
     };
-
+    
     ext.onNotCommandReceived = async (ctx, msg) => {
 
         const currentDay = seal.vars.intGet(ctx, `$tDay`)[0];
-
+        
         // 获取加密变量并解密
         const lastUpdatedDayStr = getDecryptedVar(ctx, `$m时间变量`);
         const todayCountStr = getDecryptedVar(ctx, `$m今日老婆次数`);
-
+        
         const lastUpdatedDay = parseInt(lastUpdatedDayStr) || 0;
         let todayCount = parseInt(todayCountStr) || 0;
 
@@ -180,7 +154,6 @@ if (!seal.ext.find('今日老婆')) {
 
         // 命令处理
         const jrlpCommands = ['jrlp', '[CQ:at,qq=2152423110] jrlp', '[CQ:at,qq=2152423110]jrlp'];
-        const hlpCommands = ['hlp', '[CQ:at,qq=2152423110] hlp', '[CQ:at,qq=2152423110]hlp'];
         if (jrlpCommands.includes(msg.message)) {
             if (todayCount === 0) {
                 await handleWifeRequest(ctx, msg, false);
@@ -189,7 +162,7 @@ if (!seal.ext.find('今日老婆')) {
                 const wifeName = getDecryptedVar(ctx, `$m老婆名字`);
                 seal.replyToSender(ctx, msg, seal.format(ctx, `[CQ:image,file=${wifeImg}]\n{$t玩家}今天的老婆是${wifeName}`));
             }
-        } else if (hlpCommands.includes(msg.message)) {
+        } else if (msg.message === 'hlp') {
             if (todayCount === 0) {
                 seal.replyToSender(ctx, msg, seal.format(ctx, `你还没有今日老婆哦，输入jrlp获取一个吧`));
             } else {
@@ -197,80 +170,4 @@ if (!seal.ext.find('今日老婆')) {
             }
         }
     };
-
-    const cmdjrlp = seal.ext.newCmdItemInfo();
-    cmdjrlp.name = '今日老婆';
-    cmdjrlp.help = '使用status查看服务状态，不加参数将返回今日老婆';
-    cmdjrlp.solve = async (ctx, msg, cmdArgs) => {
-        let val = cmdArgs.getArgN(1);
-        switch (val) {
-            case 'status': {
-
-                return seal.ext.newCmdExecuteResult(true);
-            }
-            default: {
-                const currentDay = seal.vars.intGet(ctx, `$tDay`)[0];
-
-                // 获取加密变量并解密
-                const lastUpdatedDayStr = getDecryptedVar(ctx, `$m时间变量`);
-                const todayCountStr = getDecryptedVar(ctx, `$m今日老婆次数`);
-
-                const lastUpdatedDay = parseInt(lastUpdatedDayStr) || 0;
-                let todayCount = parseInt(todayCountStr) || 0;
-
-                // 每日重置
-                if (currentDay != lastUpdatedDay) {
-                    setEncryptedVar(ctx, `$m时间变量`, currentDay);
-                    setEncryptedVar(ctx, `$m今日老婆次数`, 0);
-                    todayCount = 0; // 重置计数器
-                }
-
-                if (todayCount === 0) {
-                    await handleWifeRequest(ctx, msg, false);
-                } else {
-                    const wifeImg = getDecryptedVar(ctx, `$m今日老婆`);
-                    const wifeName = getDecryptedVar(ctx, `$m老婆名字`);
-                    seal.replyToSender(ctx, msg, seal.format(ctx, `[CQ:image,file=${wifeImg}]\n{$t玩家}今天的老婆是${wifeName}`));
-                }
-
-                return seal.ext.newCmdExecuteResult(true);
-            }
-        }
-    };
-
-    const cmdhlp = seal.ext.newCmdItemInfo();
-    cmdhlp.name = '换老婆';
-    cmdhlp.help = '更换今日老婆';
-    cmdhlp.solve = async (ctx, msg, cmdArgs) => {
-        let val = cmdArgs.getArgN(1);
-
-        const currentDay = seal.vars.intGet(ctx, `$tDay`)[0];
-
-        // 获取加密变量并解密
-        const lastUpdatedDayStr = getDecryptedVar(ctx, `$m时间变量`);
-        const todayCountStr = getDecryptedVar(ctx, `$m今日老婆次数`);
-
-        const lastUpdatedDay = parseInt(lastUpdatedDayStr) || 0;
-        let todayCount = parseInt(todayCountStr) || 0;
-
-        // 每日重置
-        if (currentDay != lastUpdatedDay) {
-            setEncryptedVar(ctx, `$m时间变量`, currentDay);
-            setEncryptedVar(ctx, `$m今日老婆次数`, 0);
-            todayCount = 0; // 重置计数器
-        }
-
-        if (todayCount === 0) {
-            seal.replyToSender(ctx, msg, seal.format(ctx, `你还没有今日老婆哦，输入jrlp获取一个吧`));
-        } else {
-            await handleWifeRequest(ctx, msg, true);
-        }
-
-        return seal.ext.newCmdExecuteResult(true);
-    }
-    // 将命令注册到扩展中
-    ext.cmdMap['jrlp'] = cmdjrlp;
-    ext.cmdMap['今日老婆'] = cmdjrlp;
-    ext.cmdMap['hlp'] = cmdhlp;
-    ext.cmdMap['换老婆'] = cmdhlp;
-};
+}
