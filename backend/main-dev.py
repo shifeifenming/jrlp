@@ -28,7 +28,7 @@ def debug_log(message):
 
 def count_images_recursive(directory):
     total = 0
-    valid_extensions = ('.png', '.jpg', '.jpeg', '.gif')
+    valid_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
     try:
         items = os.listdir(directory)
         for item in items:
@@ -70,7 +70,7 @@ async def get_random_character_data():
             selected_sub_file = random.choice(image_files_in_folder)
             selected_image_file = os.path.join(random_item, selected_sub_file)
 
-        elif os.path.isfile(random_item_path) and random_item.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+        elif os.path.isfile(random_item_path) and random_item.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
             selected_image_file = random_item
 
         else:
