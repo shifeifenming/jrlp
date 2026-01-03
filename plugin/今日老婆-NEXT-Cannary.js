@@ -168,7 +168,7 @@ if (!ext) {
             }
             try {
                 const d = await res.json();
-                seal.replyToSender(ctx, msg, `API 状态: ${d.service_availability}\nCPU: ${d.system_metrics.cpu_usage_percent}%`);
+                seal.replyToSender(ctx, msg, `API 状态: ${d.service_availability}\nCPU: ${d.system_metrics.cpu_usage_percent}%\nRAM: ${d.system_metrics.memory_usage.used_gb}/${d.system_metrics.memory_usage.total_gb} (${d.system_metrics.memory_usage['percent']}%)\nImgNum: ${d.image_statistics.total_count}`);
             } catch (e) {
                 // 解析JSON失败
                 seal.replyToSender(ctx, msg, "解析后端响应失败");

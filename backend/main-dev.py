@@ -11,16 +11,13 @@ from fastapi.responses import FileResponse
 
 app = FastAPI()
 
-# 存放图片的目录
 IMAGE_DIR = "./img"
 
-# 访问计数器
 access_counts = {
     "/api/character": 0,
     "/status": 0
 }
 
-# 全局变量用于控制调试输出
 DEBUG_MODE = False
 
 
@@ -29,11 +26,25 @@ def debug_log(message):
         print(f"[DEBUG] {message}", file=sys.stderr)
 
 
-# 挂载静态文件目录
+def count_images_recursive(directory):
+    total = 0
+    valid_extensions = ('.png', '.jpg', '.jpeg', '.gif')
+    try:
+        items = os.listdir(directory)
+        for item in items:
+            full_path = os.path.join(directory, item)
+            if os.path.isdir(full_path):
+                total += count_images_recursive(full_path)
+            elif os.path.isfile(full_path) and item.lower().endswith(valid_extensions):
+                total += 1
+    except Exception:
+        pass
+    return total
+
+
 app.mount("/img", StaticFiles(directory=IMAGE_DIR), name="images")
 
 
-# 方法: GET | 返回: JSON(含Base64) | 作用: 随机角色图及编码
 @app.get("/api/character")
 async def get_random_character_data():
     access_counts["/api/character"] += 1
@@ -72,7 +83,6 @@ async def get_random_character_data():
         full_path = os.path.join(IMAGE_DIR, selected_image_file)
         debug_log(f"最终确定的图片路径: {full_path}")
 
-        # 读取图片并转换为 base64
         with open(full_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
         debug_log("Base64 转换成功")
@@ -94,12 +104,13 @@ async def get_random_character_data():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# 方法: GET | 返回: JSON(负载数据) | 作用: 监控系统运行状态
 @app.get("/status")
 async def get_system_status():
     access_counts["/status"] += 1
     cpu_usage = psutil.cpu_percent(interval=1)
     mem = psutil.virtual_memory()
+    total_images = count_images_recursive(IMAGE_DIR)
+
     return {
         "service_availability": "Available",
         "system_metrics": {
@@ -107,20 +118,21 @@ async def get_system_status():
             "memory_usage": {
                 "total_gb": round(mem.total / (1024 ** 3), 2),
                 "used_gb": round(mem.used / (1024 ** 3), 2),
-                "percent": mem_usage if 'mem_usage' in locals() else mem.percent
+                "percent": mem.percent
             }
+        },
+        "image_statistics": {
+            "total_count": total_images
         },
         "access_statistics": access_counts
     }
 
 
-# 方法: GET | 返回: JSON(消息) | 作用: API 根路径欢迎
 @app.get('/')
 async def root():
     return {"message": "欢迎！"}
 
 
-# 方法: GET | 返回: File(图标) | 作用: 返回网站小图标
 @app.get("/favicon.ico")
 async def favicon():
     return FileResponse("favicon.ico")
