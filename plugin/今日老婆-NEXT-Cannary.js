@@ -19,6 +19,7 @@ if (!ext) {
     seal.ext.registerBoolConfig(ext, 'debug', false, '调试模式 【报告问题前必须启用】');
     seal.ext.registerBoolConfig(ext, 'useSealCode', false, '使用海豹码代替CQ码 不懂别开');
     seal.ext.registerBoolConfig(ext, 'useBase64CQ', false, '使用 base64:// CQ Code 不懂别开');
+    seal.ext.registerBoolConfig(ext, 'noFormat', false, '不执行 format 不懂别开')
     seal.ext.registerStringConfig(ext, "api_url", "http://localhost:18428", "jrlp 后端地址 [ 必须以 http(s):// 开头，且结尾不能有 / ]");
     seal.ext.registerIntConfig(ext, "daily_hlp_limit", 5, "每天最多换老婆次数");
     seal.ext.registerIntConfig(ext, "retry_times", 3, "API失败重试次数");
@@ -100,6 +101,7 @@ if (!ext) {
     const formatWifeResponse = (ctx, data, suffix = "") => {
         const useSeal = seal.ext.getBoolConfig(ext, 'useSealCode');
         const useB64 = seal.ext.getBoolConfig(ext, 'useBase64CQ');
+        const noFormat = seal.ext.getBoolConfig(ext, 'noFormat');
         let imgPart;
 
         if (useSeal) {
@@ -110,6 +112,7 @@ if (!ext) {
             imgPart = `[CQ:image,file=${data.image_url}]`;
         }
 
+        if (noFormat) return `${imgPart}\n{$t玩家}今天的老婆是${data.filename}${suffix}`;
         return seal.format(ctx, `${imgPart}\n{$t玩家}今天的老婆是${data.filename}${suffix}`);
     };
 
