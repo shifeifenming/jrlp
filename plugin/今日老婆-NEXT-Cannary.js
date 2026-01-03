@@ -71,16 +71,11 @@ if (!ext) {
         const apiUrl = `${seal.ext.getStringConfig(ext, "api_url")}/api/character`;
         logDebug(`正在请求 API: ${apiUrl}`);
 
-        try {
-            const response = await fetch(apiUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            logDebug(`API 响应成功: 获取到角色 [${data.filename}]`);
-            return data;
-        } catch (error) {
-            logDebug(`API 请求失败: ${error.message}`);
-            throw error;
-        }
+        const response = await fetch(apiUrl);
+        if (!response.ok) console.error(`API 请求失败: HTTP ${response.status}`);
+        const data = await response.json();
+        logDebug(`API 响应成功: 获取到角色 [${data.filename}]`);
+        return data;
     }
 
     /**
@@ -92,7 +87,7 @@ if (!ext) {
     const formatWifeResponse = (ctx, data, suffix = "") => {
         const useSeal = seal.ext.getBoolConfig(ext, 'useSealCode');
         const useB64 = seal.ext.getBoolConfig(ext, 'useBase64CQ');
-        let imgPart = "";
+        let imgPart;
 
         if (useSeal) {
             imgPart = `[图:${data.image_url}]`;
@@ -198,7 +193,7 @@ if (!ext) {
 
     // --- 关键词监听 ---
     ext.onNotCommandReceived = async (ctx, msg) => {
-        const text = msg.message.replace(/\[CQ:at,qq=.*?\]\s*/, '').trim();
+        const text = msg.message.replace(/\[CQ:at,qq=.*?]\s*/, '').trim();
         if (['jrlp', '今日老婆'].includes(text)) {
             await handleWifeRequest(ctx, msg, false);
         } else if (['hlp', '换老婆'].includes(text)) {
