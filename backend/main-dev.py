@@ -5,6 +5,7 @@ import uvicorn
 import psutil
 import base64
 import sys
+import urllib.parse
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -31,6 +32,7 @@ def refresh_image_cache():
     for root, dirs, files in os.walk(IMAGE_DIR):
         for f in files:
             if f.lower().endswith(valid_extensions):
+                # 存储相对于 IMAGE_DIR 的原始路径
                 rel_path = os.path.relpath(os.path.join(root, f), IMAGE_DIR)
                 temp_list.append(rel_path)
     cached_image_paths = temp_list
@@ -38,15 +40,12 @@ def refresh_image_cache():
 
 
 @asynccontextmanager
-async def lifespan():
-    # [启动时执行]
+async def lifespan(app: FastAPI):
     refresh_image_cache()
     yield
-    # [关闭时执行]
     debug_log("服务器正在关闭...")
 
 
-# 初始化 FastAPI 并注入生命周期
 app = FastAPI(lifespan=lifespan)
 
 # 静态文件挂载
@@ -69,8 +68,16 @@ async def get_random_character_data():
         with open(full_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
 
+        # 文件名（不含后缀）用于显示，不需要编码
         file_name_without_extension = os.path.splitext(os.path.basename(selected_rel_path))[0]
-        image_sub = f"/img/{selected_rel_path.replace(os.sep, '/')}"
+
+        # 统一分隔符为 /
+        path_with_slashes = selected_rel_path.replace(os.sep, '/')
+        # 对路径进行 URL 编码，保留斜杠不编码
+        encoded_sub_path = urllib.parse.quote(path_with_slashes)
+        image_sub = f"/img/{encoded_sub_path}"
+
+        debug_log(f"选中图片: {selected_rel_path} -> 编码后路径: {image_sub}")
 
         return {
             "filename": file_name_without_extension,
