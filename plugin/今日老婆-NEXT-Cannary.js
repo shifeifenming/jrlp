@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         今日老婆
 // @author       是非，艾因，群友
-// @version      1.2.1
-// @description  fixed with retry
+// @version      1.2.2
+// @description  fixed with path auto-fix and crash prevention
 // @timestamp    20240520
 // @license      Apache-2
 // ==/UserScript==
@@ -12,7 +12,7 @@
  */
 let ext = seal.ext.find('今日老婆');
 if (!ext) {
-    ext = seal.ext.new('今日老婆', '群友，艾因，是非', '1.2.1');
+    ext = seal.ext.new('今日老婆', '群友，艾因，是非', '1.2.2');
     seal.ext.register(ext);
 
     // 注册配置项
@@ -20,14 +20,17 @@ if (!ext) {
     seal.ext.registerBoolConfig(ext, 'useSealCode', false, '使用海豹码代替CQ码 不懂别开');
     seal.ext.registerBoolConfig(ext, 'useBase64CQ', false, '使用 base64:// CQ Code 不懂别开');
     seal.ext.registerBoolConfig(ext, 'noFormat', false, '不执行 format 不懂别开')
-    seal.ext.registerStringConfig(ext, "api_url", "http://localhost:18428", "jrlp 后端地址 [ 必须以 http(s):// 开头，且结尾不能有 / ]");
+    seal.ext.registerStringConfig(ext, "api_url", "http://localhost:18428", "jrlp 后端地址 [ 结尾有无 / 均可 ]");
     seal.ext.registerIntConfig(ext, "daily_hlp_limit", 5, "每天最多换老婆次数");
     seal.ext.registerIntConfig(ext, "retry_times", 3, "API失败重试次数");
     seal.ext.registerIntConfig(ext, "retry_interval", 10, "重试间隔(ms)");
 
+    const getCleanApiUrl = () => seal.ext.getStringConfig(ext, "api_url").replace(/\/+$/, "");
+
     const logDebug = (info) => {
+        // console.warn('call logDebug');
         if (seal.ext.getBoolConfig(ext, 'debug')) {
-            console.log(`[jrlp-DEBUG] ${info}`);
+            console.warn(`[jrlp-DEBUG] ${info}`);
         }
     };
 
@@ -81,7 +84,7 @@ if (!ext) {
      * 获取角色数据
      */
     async function getCharacterData() {
-        const apiUrl = `${seal.ext.getStringConfig(ext, "api_url")}/api/character`;
+        const apiUrl = `${getCleanApiUrl()}/api/character`;
         logDebug(`请求API: ${apiUrl}`);
 
         const response = await fetchWithRetry(apiUrl);
@@ -93,27 +96,30 @@ if (!ext) {
         try {
             return await response.json();
         } catch (e) {
-            // 解析失败处理
+            logDebug(`JSON解析失败: ${e.message}`);
             return null;
         }
     }
 
     const formatWifeResponse = (ctx, data, suffix = "") => {
+        if (!data) return "获取数据异常";
         const useSeal = seal.ext.getBoolConfig(ext, 'useSealCode');
         const useB64 = seal.ext.getBoolConfig(ext, 'useBase64CQ');
         const noFormat = seal.ext.getBoolConfig(ext, 'noFormat');
+        const baseUrl = getCleanApiUrl();
         let imgPart;
 
         if (useSeal) {
-            imgPart = `[图:${data.image_url}]`;
-        } else if (useB64) {
+            imgPart = `[图:${baseUrl}${data.image_sub}]`;
+        } else if (useB64 && data.image_base64) {
             imgPart = `[CQ:image,file=base64://${data.image_base64}]`;
         } else {
-            imgPart = `[CQ:image,file=${data.image_url}]`;
+            imgPart = `[CQ:image,file=${baseUrl}${data.image_sub}]`;
         }
 
-        if (noFormat) return `${imgPart}\n{$t玩家}今天的老婆是${data.filename}${suffix}`;
-        return seal.format(ctx, `${imgPart}\n{$t玩家}今天的老婆是${data.filename}${suffix}`);
+        const name = data.filename || "神秘角色";
+        if (noFormat) return `${imgPart}\n{$t玩家}今天的老婆是${name}${suffix}`;
+        return seal.format(ctx, `${imgPart}\n{$t玩家}今天的老婆是${name}${suffix}`);
     };
 
     const handleWifeRequest = async (ctx, msg, isHlp) => {
@@ -125,7 +131,7 @@ if (!ext) {
 
         if (!isHlp && todayCount > 0) {
             const oldData = {
-                image_url: seal.vars.strGet(ctx, `$m今日老婆`)[0],
+                image_sub: seal.vars.strGet(ctx, `$m今日老婆sub`)[0],
                 image_base64: seal.vars.strGet(ctx, `$m今日老婆b64`)[0],
                 filename: seal.vars.strGet(ctx, `$m老婆名字`)[0]
             };
@@ -135,7 +141,7 @@ if (!ext) {
 
         if (isHlp && todayCount >= limit) {
             const oldData = {
-                image_url: seal.vars.strGet(ctx, `$m今日老婆`)[0],
+                image_sub: seal.vars.strGet(ctx, `$m今日老婆sub`)[0],
                 image_base64: seal.vars.strGet(ctx, `$m今日老婆b64`)[0],
                 filename: seal.vars.strGet(ctx, `$m老婆名字`)[0]
             };
@@ -150,9 +156,9 @@ if (!ext) {
             return;
         }
 
-        seal.vars.strSet(ctx, `$m今日老婆`, data.image_url);
-        seal.vars.strSet(ctx, `$m今日老婆b64`, data.image_base64);
-        seal.vars.strSet(ctx, `$m老婆名字`, data.filename);
+        seal.vars.strSet(ctx, `$m今日老婆sub`, data.image_sub || "");
+        seal.vars.strSet(ctx, `$m今日老婆b64`, data.image_base64 || "");
+        seal.vars.strSet(ctx, `$m老婆名字`, data.filename || "");
         seal.vars.strSet(ctx, `$m今日老婆次数`, String(todayCount + 1));
 
         seal.replyToSender(ctx, msg, formatWifeResponse(ctx, data));
@@ -163,7 +169,7 @@ if (!ext) {
     cmdjrlp.help = '.jrlp 查看今日老婆\n.jrlp status 查看后端状态';
     cmdjrlp.solve = async (ctx, msg, cmdArgs) => {
         if (cmdArgs.getArgN(1) === 'status') {
-            const apiUrl = `${seal.ext.getStringConfig(ext, "api_url")}/status`;
+            const apiUrl = `${getCleanApiUrl()}/status`;
             const res = await fetchWithRetry(apiUrl);
             if (!res) {
                 seal.replyToSender(ctx, msg, "无法连接到后端服务");
@@ -173,7 +179,6 @@ if (!ext) {
                 const d = await res.json();
                 seal.replyToSender(ctx, msg, `API 状态: ${d.service_availability}\nCPU: ${d.system_metrics.cpu_usage_percent}%\nRAM: ${d.system_metrics.memory_usage.used_gb}/${d.system_metrics.memory_usage.total_gb} (${d.system_metrics.memory_usage['percent']}%)\nImgNum: ${d.image_statistics.total_count}`);
             } catch (e) {
-                // 解析JSON失败
                 seal.replyToSender(ctx, msg, "解析后端响应失败");
             }
             return seal.ext.newCmdExecuteResult(true);
